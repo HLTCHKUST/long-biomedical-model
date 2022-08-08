@@ -12,3 +12,6 @@ tqdm>=4.64.0
 transformers>=4.19.4
 nltk>=3.7
 flair>=0.11.1
+accelerate
+protobuf
+git+https://github.com/bigscience-workshop/biomedical.git
