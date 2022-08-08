@@ -61,6 +61,9 @@ def load_datasets(data_args, model_args, training_args):
                 raw_datasets[helper.dataset_name] = helper.load_dataset(data_dir=helper.dataset_name)
             else:
                 raw_datasets[helper.dataset_name] = helper.load_dataset()
+                
+        # Choose dataset
+        raw_datasets = raw_datasets[data_args.dataset_name]
     elif data_args.task_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
@@ -143,9 +146,6 @@ def load_datasets(data_args, model_args, training_args):
     def delist(example):
         example["labels"] = example["labels"][0]
         return example
-    
-    # Choose dataset
-    raw_datasets = raw_datasets[data_args.dataset_name]
 
     # Labels
     if data_args.dataset_name == 'n2c2_2006_smokers':
