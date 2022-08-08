@@ -111,7 +111,7 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    train_dataset, eval_dataset, model, tokenizer = load_datasets(data_args, model_args, training_args)
+    train_dataset, eval_dataset, model, tokenizer, is_regression = load_datasets(data_args, model_args, training_args)
 
     # Log a few random samples from the training set:
     if training_args.do_train:
