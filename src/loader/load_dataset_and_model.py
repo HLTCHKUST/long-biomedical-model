@@ -149,15 +149,46 @@ def load_datasets(data_args, model_args, training_args):
 
     # Labels
     if data_args.dataset_name == 'n2c2_2006_smokers':
+        
         is_regression = False
+        is_multilabel = False
+        
         label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
         label_list.sort()
         num_labels = len(label_list)
+        
     elif data_args.dataset_name == 'n2c2_2008':
+        
         is_regression = False
+        is_multilabel = True
+        
+        disease_names, labels = [], []
         label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
-        label_list.sort()
-        num_labels = len(label_list)
+        for dict_string in label_list:
+            disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
+            label = dict_string[dict_string.find('label')+len('label')+4:-2]
+            disease_names.append(disease_name)
+            labels.append(label)
+
+        unique_labels = list(set(labels))
+        unique_disease_names = list(set(disease_names))
+        num_labels = len(unique_disease_names)
+        unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
+        unique_disease_names_to_id = {v: i for i, v in enumerate(unique_disease_names)}
+        
+        def numerize_multiclass_label(example):
+
+            label_numerized = [None]*len(unique_disease_names)
+            for dict_string in example['labels']:
+                disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
+                label = dict_string[dict_string.find('label')+len('label')+4:-2]
+                label_numerized[unique_disease_names_to_id[disease_name]] = float(unique_labels_to_id[label])
+
+            example['labels'] = [-1 if label==None else label for label in label_numerized]
+            return example
+        
+        raw_datasets = raw_datasets.map(numerize_multiclass_label)
+        
     elif data_args.dataset_name == 'n2c2_2014_risk_factors':
         is_regression = False
         label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
@@ -200,6 +231,9 @@ def load_datasets(data_args, model_args, training_args):
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
+        problem_type='multi_label_classification' if is_multilabel else \
+                     'single_label_classification' if not is_regression else \
+                     'regression'
     )
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
@@ -224,11 +258,14 @@ def load_datasets(data_args, model_args, training_args):
         sentence1_key = 'text'
         sentence2_key = None
     elif data_args.dataset_name == 'n2c2_2008':
-        pass
+        sentence1_key = 'text'
+        sentence2_key = None
     elif data_args.dataset_name == 'n2c2_2014_risk_factors':
-        pass
+        sentence1_key = 'text'
+        sentence2_key = None
     elif data_args.dataset_name == 'n2c2_2018_track1':
-        pass
+        sentence1_key = 'text'
+        sentence2_key = None
     elif data_args.task_name is not None:
         sentence1_key, sentence2_key = task_to_keys[data_args.task_name]
     else:
@@ -248,42 +285,40 @@ def load_datasets(data_args, model_args, training_args):
     else:
         # We will pad later, dynamically at batch creation, to the max sequence length in each batch
         padding = False
-        
-    # Some models have set the order of the labels to use, so let's make sure we do use it.
-    label_to_id = None
-    if (
-        model.config.label2id != PretrainedConfig(num_labels=num_labels).label2id
-        and data_args.task_name is not None
-        and not is_regression
-    ):
-        # Some have all caps in their config, some don't.
-        label_name_to_id = {k.lower(): v for k, v in model.config.label2id.items()}
-        if list(sorted(label_name_to_id.keys())) == list(sorted(label_list)):
-            label_to_id = {i: int(label_name_to_id[label_list[i]]) for i in range(num_labels)}
-        else:
-            logger.warning(
-                "Your model seems to have been trained with labels, but they don't match the dataset: ",
-                f"model labels: {list(sorted(label_name_to_id.keys()))}, dataset labels: {list(sorted(label_list))}."
-                "\nIgnoring the model labels as a result.",
-            )
-    elif data_args.task_name is None and not is_regression:
-        label_to_id = {v: i for i, v in enumerate(label_list)}
+    
+    if not is_multilabel:
+        # Some models have set the order of the labels to use, so let's make sure we do use it.
+        label_to_id = None
+        if (
+            model.config.label2id != PretrainedConfig(num_labels=num_labels).label2id
+            and data_args.task_name is not None
+            and not is_regression
+        ):
+            # Some have all caps in their config, some don't.
+            label_name_to_id = {k.lower(): v for k, v in model.config.label2id.items()}
+            if list(sorted(label_name_to_id.keys())) == list(sorted(label_list)):
+                label_to_id = {i: int(label_name_to_id[label_list[i]]) for i in range(num_labels)}
+            else:
+                logger.warning(
+                    "Your model seems to have been trained with labels, but they don't match the dataset: ",
+                    f"model labels: {list(sorted(label_name_to_id.keys()))}, dataset labels: {list(sorted(label_list))}."
+                    "\nIgnoring the model labels as a result.",
+                )
+        elif data_args.task_name is None and not is_regression:
+            label_to_id = {v: i for i, v in enumerate(label_list)}
 
-    if label_to_id is not None:
-        print('DDDD'*50)
-        print(raw_datasets['train'][0]['labels'])
-        def convert_label_to_id(example):
-            example["labels"] = label_to_id[example["labels"]]
-            return example
-        raw_datasets = raw_datasets.map(convert_label_to_id)
-        print('EEEE'*50)
-        print(raw_datasets['train'][0]['labels'])
-        
-        model.config.label2id = label_to_id
-        model.config.id2label = {id: label for label, id in config.label2id.items()}
-    elif data_args.task_name is not None and not is_regression:
-        model.config.label2id = {l: i for i, l in enumerate(label_list)}
-        model.config.id2label = {id: label for label, id in config.label2id.items()}
+        if label_to_id is not None:
+            def convert_label_to_id(example):
+                example["labels"] = label_to_id[example["labels"]]
+                return example
+            raw_datasets = raw_datasets.map(convert_label_to_id)
+
+            model.config.label2id = label_to_id
+            model.config.id2label = {id: label for label, id in config.label2id.items()}
+        elif data_args.task_name is not None and not is_regression:
+            model.config.label2id = {l: i for i, l in enumerate(label_list)}
+            model.config.id2label = {id: label for label, id in config.label2id.items()}
+    
 
     if data_args.max_seq_length > tokenizer.model_max_length:
         logger.warning(
@@ -299,9 +334,10 @@ def load_datasets(data_args, model_args, training_args):
         )
         result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
 
-        # Map labels to IDs (not necessary for GLUE tasks)
-        if label_to_id is not None and "label" in examples:
-            result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
+        if not is_multilabel:
+            # Map labels to IDs (not necessary for GLUE tasks)
+            if label_to_id is not None and "label" in examples:
+                result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
         return result
 
     with training_args.main_process_first(desc="dataset map pre-processing"):
@@ -311,6 +347,15 @@ def load_datasets(data_args, model_args, training_args):
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on dataset",
         )
+
+    
+    def turn_to_float(examples):
+        examples['labels'] = np.array(examples["labels"], dtype=np.float32)
+        return examples
+    
+    if is_multilabel:
+        raw_datasets = raw_datasets.map(turn_to_float)
+    
     if training_args.do_train:
         if "train" not in raw_datasets:
             raise ValueError("--do_train requires a train dataset")
