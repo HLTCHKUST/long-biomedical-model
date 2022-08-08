@@ -318,3 +318,8 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/jupyternotebooks,python,macos,windows,linux,visualstudiocode,sublimetext,osx
+
+
+data/*
+save/*
+biomedical/*
