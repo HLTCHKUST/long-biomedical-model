@@ -243,6 +243,8 @@ def load_datasets(data_args, model_args, training_args):
         raw_datasets = raw_datasets.map(one_hot_multiclass_label)
     
     elif data_args.task_name is not None:
+        
+        is_multilabel = False
         is_regression = data_args.task_name == "stsb"
         if not is_regression:
             label_list = raw_datasets["train"].features["label"].names
