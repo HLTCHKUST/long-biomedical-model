@@ -147,18 +147,14 @@ def main():
             return result
         elif is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
-        elif is_multilabel:
-            print('X'*200)
-            print(p.label_ids, preds)
+        else:
             return {"acc": accuracy_score(p.label_ids, preds),
                     "micro-f1": f1_score(p.label_ids, preds, average='micro'),
                     "micro-recall": recall_score(p.label_ids, preds, average='micro'),
                     "micro-prec": precision_score(p.label_ids, preds, average='micro'),
                     "macro-f1": f1_score(p.label_ids, preds, average='macro'),
                     "macro-recall": recall_score(p.label_ids, preds, average='macro'),
-                    "macro-prec": precision_score(p.label_ids, preds, average='macro'),
-                    }
-#             return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
+                    "macro-prec": precision_score(p.label_ids, preds, average='macro')}
 
     # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
     # we already did the padding.

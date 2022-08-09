@@ -159,6 +159,17 @@ def load_datasets(data_args, model_args, training_args):
         
     elif data_args.dataset_name == 'n2c2_2008':
         
+        def numerize_multiclass_label(example):
+
+            label_numerized = [None]*len(unique_disease_names)
+            for dict_string in example['labels']:
+                disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
+                label = dict_string[dict_string.find('label')+len('label')+4:-2]
+                label_numerized[unique_disease_names_to_id[disease_name]] = float(unique_labels_to_id[label])
+
+            example['labels'] = [-1 if label==None else label for label in label_numerized]
+            return example
+        
         is_regression = False
         is_multilabel = True
         
@@ -171,34 +182,45 @@ def load_datasets(data_args, model_args, training_args):
             labels.append(label)
 
         unique_labels = list(set(labels))
+        unique_labels.sort()
         unique_disease_names = list(set(disease_names))
+        unique_disease_names.sort()
         num_labels = len(unique_disease_names)
         unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
         unique_disease_names_to_id = {v: i for i, v in enumerate(unique_disease_names)}
         
-        def numerize_multiclass_label(example):
-
-            label_numerized = [None]*len(unique_disease_names)
-            for dict_string in example['labels']:
-                disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
-                label = dict_string[dict_string.find('label')+len('label')+4:-2]
-                label_numerized[unique_disease_names_to_id[disease_name]] = float(unique_labels_to_id[label])
-
-            example['labels'] = [-1 if label==None else label for label in label_numerized]
-            return example
-        
         raw_datasets = raw_datasets.map(numerize_multiclass_label)
         
     elif data_args.dataset_name == 'n2c2_2014_risk_factors':
+        
         is_regression = False
+        is_multilabel = True
+        
         label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
         label_list.sort()
         num_labels = len(label_list)
+        
     elif data_args.dataset_name == 'n2c2_2018_track1':
+        
+        def one_hot_multiclass_label(example):
+            label_numerized = [1.0]*len(unique_labels)
+            for label in example['labels']:
+                label_numerized[unique_labels_to_id[label]] = .0
+
+            example['labels'] = label_numerized
+            return example
+        
         is_regression = False
+        is_multilabel = True
+        
         label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
         label_list.sort()
         num_labels = len(label_list)
+
+        unique_labels = list(set(flatten_all_list(raw_datasets['train']['labels'])))
+        unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
+
+        raw_datasets = raw_datasets.map(one_hot_multiclass_label)
     
     elif data_args.task_name is not None:
         is_regression = data_args.task_name == "stsb"
@@ -338,6 +360,7 @@ def load_datasets(data_args, model_args, training_args):
             # Map labels to IDs (not necessary for GLUE tasks)
             if label_to_id is not None and "label" in examples:
                 result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
+
         return result
 
     with training_args.main_process_first(desc="dataset map pre-processing"):
@@ -347,7 +370,9 @@ def load_datasets(data_args, model_args, training_args):
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on dataset",
         )
-
+        
+    print('XXX'*300)    
+    print(raw_datasets)
     
     def turn_to_float(examples):
         examples['labels'] = np.array(examples["labels"], dtype=np.float32)
@@ -355,6 +380,9 @@ def load_datasets(data_args, model_args, training_args):
     
     if is_multilabel:
         raw_datasets = raw_datasets.map(turn_to_float)
+        
+    print('XXX'*300)
+    print(raw_datasets['train'][0]['labels'])
     
     if training_args.do_train:
         if "train" not in raw_datasets:
