@@ -20,11 +20,12 @@ import logging
 import os
 import random
 import sys
+import re
 
 import datasets
 import numpy as np
 
-
+import itertools
 import evaluate
 import transformers
 from transformers import (
@@ -43,6 +44,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
+from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_score
 
 from src.loader.load_dataset_and_model import load_datasets
 from src.utils.args_helper import DataTrainingArguments, ModelArguments
@@ -111,7 +113,8 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    train_dataset, eval_dataset, model, tokenizer, is_regression = load_datasets(data_args, model_args, training_args)
+    train_dataset, eval_dataset, model, tokenizer, \
+        is_regression, is_multilabel = load_datasets(data_args, model_args, training_args)
 
     # Log a few random samples from the training set:
     if training_args.do_train:
@@ -122,22 +125,40 @@ def main():
     if data_args.task_name is not None:
         metric = evaluate.load("glue", data_args.task_name)
     else:
-        metric = evaluate.load("accuracy")
+        acc_metric = evaluate.load("accuracy")
 
     # You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
     # predictions and label_ids field) and has to return a dictionary string to float.
     def compute_metrics(p: EvalPrediction):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-        preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
+        if not is_multilabel:
+            preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
+        else:
+            preds[np.isnan(preds)]=-1
+            p.label_ids[np.isnan(p.label_ids)]=-1
+            
+            preds = list(itertools.chain.from_iterable(preds))
+            p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
+            
         if data_args.task_name is not None:
-            result = metric.compute(predictions=preds, references=p.label_ids)
+            result = acc_metric.compute(predictions=preds, references=p.label_ids)
             if len(result) > 1:
                 result["combined_score"] = np.mean(list(result.values())).item()
             return result
         elif is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
-        else:
-            return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
+        elif is_multilabel:
+            print('X'*200)
+            print(p.label_ids, preds)
+            return {"acc": accuracy_score(p.label_ids, preds),
+                    "micro-f1": f1_score(p.label_ids, preds, average='micro'),
+                    "micro-recall": recall_score(p.label_ids, preds, average='micro'),
+                    "micro-prec": precision_score(p.label_ids, preds, average='micro'),
+                    "macro-f1": f1_score(p.label_ids, preds, average='macro'),
+                    "macro-recall": recall_score(p.label_ids, preds, average='macro'),
+                    "macro-prec": precision_score(p.label_ids, preds, average='macro'),
+                    }
+#             return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
 
     # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
     # we already did the padding.

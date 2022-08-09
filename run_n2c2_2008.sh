@@ -9,6 +9,6 @@ CUDA_VISIBLE_DEVICES=5 python run_glue.py \
   --max_seq_length 128 \
   --per_device_train_batch_size 32 \
   --learning_rate 2e-5 \
-  --num_train_epochs 3 \
+  --num_train_epochs 10 \
   --output_dir ./save/$DATASET_NAME/ \
   --overwrite_output_dir

@@ -386,4 +386,4 @@ def load_datasets(data_args, model_args, training_args):
             max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
             predict_dataset = predict_dataset.select(range(max_predict_samples))
             
-    return train_dataset, eval_dataset, model, tokenizer, is_regression
+    return train_dataset, eval_dataset, model, tokenizer, is_regression, is_multilabel
