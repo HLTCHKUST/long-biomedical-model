@@ -1,7 +1,7 @@
 export DATASET_NAME=n2c2_2018_track1
 
 TOKENIZERS_PARALLELISM=false
-CUDA_VISIBLE_DEVICES=5 python run_glue.py \
+CUDA_VISIBLE_DEVICES=5 python run_nlu.py \
   --model_name_or_path bert-base-cased \
   --dataset_name $DATASET_NAME \
   --do_train \

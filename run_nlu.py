@@ -148,6 +148,8 @@ def main():
         elif is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
         else:
+            preds = np.array(preds).astype('int32')
+            p.label_ids = np.array(p.label_ids).astype('int32')
             return {"acc": accuracy_score(p.label_ids, preds),
                     "micro-f1": f1_score(p.label_ids, preds, average='micro'),
                     "micro-recall": recall_score(p.label_ids, preds, average='micro'),

@@ -1,7 +1,7 @@
 export TASK_NAME=mrpc
 
 TOKENIZERS_PARALLELISM=false
-CUDA_VISIBLE_DEVICES=5 python run_glue.py \
+CUDA_VISIBLE_DEVICES=5 python run_nlu.py \
   --model_name_or_path bert-base-cased \
   --task_name $TASK_NAME \
   --do_train \
