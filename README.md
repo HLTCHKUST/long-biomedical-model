@@ -8,7 +8,7 @@ Prepared for:
 - n2c2_2018_track1
 
 To use this repo:
-1. Put the data inside `data/n2c2_2006_smokers/*`, `data/n2c2_2008/*``, etc
+1. Put the data inside `data/n2c2_2006_smokers/*`, `data/n2c2_2008/*`, etc
 2. Run the finetuning. on your terminal do:
     - `bash run_n2c2_2006_smokers.sh` to finetune for n2c2_2006_smokers
     - `bash run_n2c2_2008.sh` to finetune for n2c2_2008
