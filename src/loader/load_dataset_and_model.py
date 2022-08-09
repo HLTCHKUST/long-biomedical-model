@@ -355,13 +355,20 @@ def load_datasets(data_args, model_args, training_args):
             (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
         )
         result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
+        
+        examples['input_ids'] = result['input_ids']
+        examples['token_type_ids'] = result['token_type_ids']
+        examples['attention_mask'] = result['attention_mask']
 
-        if not is_multilabel:
-            # Map labels to IDs (not necessary for GLUE tasks)
-            if label_to_id is not None and "label" in examples:
-                result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
+#         if not is_multilabel:
+#             # Map labels to IDs (not necessary for GLUE tasks)
+#             if label_to_id is not None and "label" in examples:
+#                 result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
 
-        return result
+        return examples
+    
+#     print('XXX'*300)    
+#     print(raw_datasets['train'][0]['labels'])
 
     with training_args.main_process_first(desc="dataset map pre-processing"):
         raw_datasets = raw_datasets.map(
@@ -371,18 +378,18 @@ def load_datasets(data_args, model_args, training_args):
             desc="Running tokenizer on dataset",
         )
         
-    print('XXX'*300)    
-    print(raw_datasets)
+#     print('XXX'*300)    
+#     print(raw_datasets['train'][0]['labels'])
     
-    def turn_to_float(examples):
-        examples['labels'] = np.array(examples["labels"], dtype=np.float32)
-        return examples
+# #     def turn_to_float(examples):
+# #         examples['labels'] = np.array(examples["labels"], dtype=np.float32)
+# #         return examples
     
-    if is_multilabel:
-        raw_datasets = raw_datasets.map(turn_to_float)
+# #     if is_multilabel:
+# #         raw_datasets = raw_datasets.map(turn_to_float)
         
-    print('XXX'*300)
-    print(raw_datasets['train'][0]['labels'])
+#     print('XXX'*300)
+#     print(raw_datasets['train'][0]['labels'])
     
     if training_args.do_train:
         if "train" not in raw_datasets:
