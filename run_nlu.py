@@ -124,8 +124,8 @@ def main():
     # Get the metric function
     if data_args.task_name is not None:
         metric = evaluate.load("glue", data_args.task_name)
-    else:
-        acc_metric = evaluate.load("accuracy")
+#     else:
+#         metric = evaluate.load("accuracy")
 
     # You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
     # predictions and label_ids field) and has to return a dictionary string to float.
@@ -141,7 +141,7 @@ def main():
             p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
             
         if data_args.task_name is not None:
-            result = acc_metric.compute(predictions=preds, references=p.label_ids)
+            result = metric.compute(predictions=preds, references=p.label_ids)
             if len(result) > 1:
                 result["combined_score"] = np.mean(list(result.values())).item()
             return result
