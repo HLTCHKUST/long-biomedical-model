@@ -56,30 +56,37 @@ def load_datasets(data_args, model_args, training_args):
         raw_datasets = {}
         for helper in notes_dset_helpers:
             if helper.dataset_name == 'psytar':
-                raw_datasets[helper.dataset_name] = helper.load_dataset(data_dir=helper.dataset_name + '/PsyTAR_dataset.xlsx')
+                raw_datasets[helper.dataset_name] = helper.load_dataset(data_dir='./datasets/' + helper.dataset_name + '/PsyTAR_dataset.xlsx')
             elif helper.is_local:
-                raw_datasets[helper.dataset_name] = helper.load_dataset(data_dir=helper.dataset_name)
+                raw_datasets[helper.dataset_name] = helper.load_dataset(data_dir='./datasets/' + helper.dataset_name)
             else:
                 raw_datasets[helper.dataset_name] = helper.load_dataset()
                 
         # Choose dataset
         raw_datasets = raw_datasets[data_args.dataset_name]
-    elif data_args.task_name is not None:
-        # Downloading and loading a dataset from the hub.
+    elif data_args.dataset_name == 'indonlu':
         raw_datasets = load_dataset(
-            "glue",
+            data_args.dataset_name,
             data_args.task_name,
             cache_dir=model_args.cache_dir,
             use_auth_token=True if model_args.use_auth_token else None,
         )
-    elif data_args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        raw_datasets = load_dataset(
-            data_args.dataset_name,
-            data_args.dataset_config_name,
-            cache_dir=model_args.cache_dir,
-            use_auth_token=True if model_args.use_auth_token else None,
-        )
+    # elif data_args.task_name is not None:
+    #     # Downloading and loading a dataset from the hub.
+    #     raw_datasets = load_dataset(
+    #         "glue",
+    #         data_args.task_name,
+    #         cache_dir=model_args.cache_dir,
+    #         use_auth_token=True if model_args.use_auth_token else None,
+    #     )
+    # elif data_args.dataset_name is not None:
+    #     # Downloading and loading a dataset from the hub.
+    #     raw_datasets = load_dataset(
+    #         data_args.dataset_name,
+    #         data_args.dataset_config_name,
+    #         cache_dir=model_args.cache_dir,
+    #         use_auth_token=True if model_args.use_auth_token else None,
+    #     )
 #     else:
 #         # Loading a dataset from your local files.
 #         # CSV/JSON training and evaluation files are needed.
@@ -148,8 +155,9 @@ def load_datasets(data_args, model_args, training_args):
         return example
 
     # Labels
+    is_regression = False
+    is_multilabel = False
     if data_args.dataset_name == 'n2c2_2006_smokers':
-        
         is_regression = False
         is_multilabel = False
         
@@ -192,9 +200,7 @@ def load_datasets(data_args, model_args, training_args):
         raw_datasets = raw_datasets.map(numerize_multiclass_label)
         
     elif data_args.dataset_name == 'n2c2_2014_risk_factors':
-        
         def one_hot_multiclass_label(example):
-
             label_numerized = [0.0]*len(unique_labels)
             for label_sentence in example['labels']:
                 label = label_sentence[label_sentence.rfind('-')+len('-'):]
@@ -405,10 +411,10 @@ def load_datasets(data_args, model_args, training_args):
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
             
-    # Add valid
+    # Use Test as Valid for debuging purpose
     raw_datasets = DatasetDict({
-                    'train': raw_datasets['train'].train_test_split(0.1)['train'],
-                    'validation': raw_datasets['train'].train_test_split(0.1)['test'],
+                    'train': raw_datasets['train'],
+                    'validation': raw_datasets['test'],
                     'test': raw_datasets['test']})
 
     if training_args.do_eval:

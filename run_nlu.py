@@ -50,7 +50,7 @@ from src.loader.load_dataset_and_model import load_datasets
 from src.utils.args_helper import DataTrainingArguments, ModelArguments
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
-check_min_version("4.22.0.dev0")
+# check_min_version("4.22.0.dev0")
 
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
 
@@ -118,12 +118,12 @@ def main():
 
     # Log a few random samples from the training set:
     if training_args.do_train:
-        for index in random.sample(range(len(train_dataset)), 3):
+        for index in random.sample(range(len(train_dataset)), 1):
             logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     # Get the metric function
-    if data_args.task_name is not None:
-        metric = evaluate.load("glue", data_args.task_name)
+    # if data_args.task_name is not None and data_args.dataset_name is not "indonlu":
+    #     metric = evaluate.load("glue", data_args.task_name)
 #     else:
 #         metric = evaluate.load("accuracy")
 
@@ -140,15 +140,9 @@ def main():
             preds = list(itertools.chain.from_iterable(preds))
             p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
             
-        if data_args.task_name is not None:
-            result = metric.compute(predictions=preds, references=p.label_ids)
-            if len(result) > 1:
-                result["combined_score"] = np.mean(list(result.values())).item()
-            return result
-        elif is_regression:
+        if is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
-        else:
-            
+        else:            
             preds = np.array(preds).astype('int32')
             p.label_ids = np.array(p.label_ids).astype('int32')
             
@@ -259,9 +253,9 @@ def main():
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-classification"}
     if data_args.task_name is not None:
         kwargs["language"] = "en"
-        kwargs["dataset_tags"] = "glue"
+        kwargs["dataset_tags"] = data_args.dataset_name
         kwargs["dataset_args"] = data_args.task_name
-        kwargs["dataset"] = f"GLUE {data_args.task_name.upper()}"
+        kwargs["dataset"] = f"{data_args.dataset_name.upper()} {data_args.task_name.upper()}"
 
     if training_args.push_to_hub:
         trainer.push_to_hub(**kwargs)

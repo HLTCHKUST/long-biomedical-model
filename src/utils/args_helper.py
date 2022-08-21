@@ -11,6 +11,7 @@ task_to_keys = {
     "sst2": ("sentence", None),
     "stsb": ("sentence1", "sentence2"),
     "wnli": ("sentence1", "sentence2"),
+    "emot": ("tweet", None)
 }
 
 @dataclass
@@ -46,7 +47,7 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Overwrite the cached preprocessed datasets or not."}
     )
     pad_to_max_length: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": (
                 "Whether to pad all samples to `max_seq_length`. "
@@ -92,8 +93,12 @@ class DataTrainingArguments:
     def __post_init__(self):
         if self.task_name is not None:
             self.task_name = self.task_name.lower()
-            if self.task_name not in task_to_keys.keys():
-                raise ValueError("Unknown task, you should pick one in " + ",".join(task_to_keys.keys()))
+            if self.dataset_name == 'indonlu':
+                pass
+            else:
+                # GLUE
+                if self.task_name not in task_to_keys.keys():
+                    raise ValueError("Unknown task, you should pick one in " + ",".join(task_to_keys.keys()))
         elif self.dataset_name is not None:
             pass
         elif self.train_file is None or self.validation_file is None:
