@@ -23,12 +23,130 @@ from transformers import (
     set_seed,
 )
 
+from transformers import ElectraConfig, ElectraForSequenceClassification, ElectraTokenizerFast
+from transformers import RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer
+from transformers import LongformerConfig, LongformerForSequenceClassification, LongformerTokenizer, LongformerSelfAttention
+
 from bigbio.dataloader import BigBioConfigHelpers
 from src.utils.args_helper import task_to_keys
 
+### 
+# Long Models Loader Function for BioElectra & Bio-lm
+###
+def convert_roberta_like_to_longformer(state_dict, model_name, max_seq_length):
+    orig_keys = [key for key in state_dict]
+    for key in orig_keys:
+        if model_name in key:
+            new_key = key.replace(model_name,'longformer')
+            if '.position_ids' in new_key:
+                del state_dict[key]
+                continue
+
+            if 'query.' in new_key:
+                state_dict[new_key] = state_dict[key]
+                state_dict[new_key.replace('.query.','.query_global.')] = state_dict[key]
+            elif 'key.' in new_key:
+                state_dict[new_key] = state_dict[key]
+                state_dict[new_key.replace('.key.','.key_global.')] = state_dict[key]
+            elif 'value.' in new_key:
+                state_dict[new_key] = state_dict[key]
+                state_dict[new_key.replace('.value.','.value_global.')] = state_dict[key]
+            elif '.position_embeddings' in new_key:
+                cur_seq_len = state_dict[key].shape[0]
+                print(cur_seq_len, max_seq_length)
+                assert max_seq_length % cur_seq_len == 0
+                
+                multiplier = max_seq_length // cur_seq_len
+                state_dict[new_key] = state_dict[key].repeat([multiplier,1])
+            else:
+                state_dict[new_key] = state_dict[key]
+            del state_dict[key]
+    return state_dict
+
+def load_long_model(model_args, data_args, num_labels, is_multilabel, is_regression):
+    if 'bio-lm' in model_args.model_name_or_path:
+        model_path = "models/RoBERTa-base-PM-M3-Voc-distill-align-hf"
+        biolm_config = RobertaConfig.from_pretrained(
+            model_path, 
+            num_labels=num_labels,
+            finetuning_task=data_args.task_name,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            problem_type='multi_label_classification' if is_multilabel else \
+                         'single_label_classification' if not is_regression else \
+                         'regression'
+        )
+        biolm_model = RobertaForSequenceClassification.from_pretrained(
+            model_path,
+            config=biolm_config
+        )
+        biolm_tokenizer = RobertaTokenizer.from_pretrained(model_path)
+        
+        # Longify
+        longformer_config = LongformerConfig.from_pretrained(
+            'allenai/longformer-base-4096',
+            num_labels=num_labels,
+            finetuning_task=data_args.task_name,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            problem_type='multi_label_classification' if is_multilabel else \
+                         'single_label_classification' if not is_regression else \
+                         'regression',
+            max_position_embeddings=data_args.max_seq_length,
+            vocab_size=biolm_config.vocab_size,
+            type_vocab_size=biolm_config.type_vocab_size
+        )
+        longformer_model = LongformerForSequenceClassification(config=longformer_config)
+        
+        longformer_state_dict = convert_roberta_like_to_longformer(biolm_model.state_dict(), 'roberta', data_args.max_seq_length)
+        longformer_model.load_state_dict(longformer_state_dict, strict=True)
+        
+        return longformer_config, biolm_tokenizer, longformer_model
+    else:
+        bioelectra_config = ElectraConfig.from_pretrained(
+            model_args.model_name_or_path, 
+            num_labels=num_labels,
+            finetuning_task=data_args.task_name,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            problem_type='multi_label_classification' if is_multilabel else \
+                         'single_label_classification' if not is_regression else \
+                         'regression'
+        )
+        bioelectra_model = ElectraForSequenceClassification.from_pretrained(
+            model_args.model_name_or_path, 
+            config=bioelectra_config
+        )
+        bioelectra_tokenizer = ElectraTokenizerFast.from_pretrained(model_args.model_name_or_path)
+
+        # Longify
+        longformer_config = LongformerConfig.from_pretrained(
+            'allenai/longformer-base-4096',
+            num_labels=num_labels,
+            finetuning_task=data_args.task_name,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            problem_type='multi_label_classification' if is_multilabel else \
+                         'single_label_classification' if not is_regression else \
+                         'regression',
+            max_position_embeddings=data_args.max_seq_length,
+            vocab_size=bioelectra_config.vocab_size,
+            type_vocab_size=bioelectra_config.type_vocab_size
+        )
+        longformer_model = LongformerForSequenceClassification(config=longformer_config)
+        longformer_state_dict = convert_roberta_like_to_longformer(bioelectra_model.state_dict(), 'electra', data_args.max_seq_length)
+        longformer_model.load_state_dict(longformer_state_dict, strict=True)
+        
+        return longformer_config, bioelectra_tokenizer, longformer_model
+    
+###
+# General Load Dataset & Models function
+###
 def load_datasets(data_args, model_args, training_args):
-
-
     # Get the datasets: you can either provide your own CSV/JSON training and evaluation files (see below)
     # or specify a GLUE benchmark task (the dataset will be downloaded automatically from the datasets Hub).
     #
@@ -161,8 +279,7 @@ def load_datasets(data_args, model_args, training_args):
         is_regression = False
         is_multilabel = False
         
-        label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
-        label_list.sort()
+        label_list = sorted(list(set(flatten_all_list(raw_datasets['train']['labels']))))
         num_labels = len(label_list)
         
     elif data_args.dataset_name == 'n2c2_2008':
@@ -274,35 +391,40 @@ def load_datasets(data_args, model_args, training_args):
     #
     # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
-    config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        num_labels=num_labels,
-        finetuning_task=data_args.task_name,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-        problem_type='multi_label_classification' if is_multilabel else \
-                     'single_label_classification' if not is_regression else \
-                     'regression'
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=model_args.use_fast_tokenizer,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-        ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-    )
+    if 'bioelectra' in model_args.model_name_or_path or 'bio-lm' in model_args.model_name_or_path:
+        config, tokenizer, model = load_long_model(model_args, data_args, num_labels, is_multilabel, is_regression)
+    else:
+        config = AutoConfig.from_pretrained(
+            model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+            num_labels=num_labels,
+            finetuning_task=data_args.task_name,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            problem_type='multi_label_classification' if is_multilabel else \
+                         'single_label_classification' if not is_regression else \
+                         'regression'
+        )
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+            cache_dir=model_args.cache_dir,
+            use_fast=model_args.use_fast_tokenizer,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
+        )
     
+    ###
     # Preprocessing the raw_datasets
+    ###
     if data_args.dataset_name == 'n2c2_2006_smokers':
         raw_datasets = raw_datasets.map(delist)
         sentence1_key = 'text'
@@ -383,11 +505,17 @@ def load_datasets(data_args, model_args, training_args):
             (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
         )
         result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
+        # result = tokenizer(*args, padding=padding, truncation=False)
         
-        examples['input_ids'] = result['input_ids']
-        examples['token_type_ids'] = result['token_type_ids']
-        examples['attention_mask'] = result['attention_mask']
-
+        if len(result['input_ids']) > max_seq_length:
+            examples['input_ids'] = [result['input_ids'][0]] + result['input_ids'][1-max_seq_length:]
+        else:
+            examples['input_ids'] = result['input_ids'][:max_seq_length]
+            
+        if 'token_type_ids' in result:
+            examples['token_type_ids'] = result['token_type_ids'][:max_seq_length]
+        examples['attention_mask'] = result['attention_mask'][:max_seq_length]
+        
 #         if not is_multilabel:
 #             # Map labels to IDs (not necessary for GLUE tasks)
 #             if label_to_id is not None and "label" in examples:
@@ -398,8 +526,8 @@ def load_datasets(data_args, model_args, training_args):
     with training_args.main_process_first(desc="dataset map pre-processing"):
         raw_datasets = raw_datasets.map(
             preprocess_function,
-            batched=True,
-            load_from_cache_file=not data_args.overwrite_cache,
+            batched=False,
+            load_from_cache_file=False,
             desc="Running tokenizer on dataset",
         )
     
