@@ -9,7 +9,7 @@ CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
   --logging_steps 10 \
   --max_seq_length 512 \
   --per_device_train_batch_size 32 \
-  --learning_rate 5e-5 \
-  --num_train_epochs 20 \
+  --learning_rate 1e-5 \
+  --num_train_epochs 100 \
   --output_dir ./save/$DATASET_NAME/ \
   --overwrite_output_dir
