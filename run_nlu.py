@@ -36,7 +36,6 @@ from transformers import (
     EvalPrediction,
     HfArgumentParser,
     PretrainedConfig,
-    Trainer,
     TrainingArguments,
     default_data_collator,
     set_seed,
@@ -48,6 +47,7 @@ from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_sc
 
 from src.loader.load_dataset_and_model import load_datasets
 from src.utils.args_helper import DataTrainingArguments, ModelArguments
+from src.trainer.trainer import get_trainer
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.22.0.dev0")
@@ -139,7 +139,12 @@ def main():
             
             preds = list(itertools.chain.from_iterable(preds))
             p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
-            
+
+            ## QUICK FIX FOR 2008
+            _preds = preds
+            num_classes = len(p.label_ids)
+            num_labels = len(preds) // num_classes
+            preds = [np.argmax(_preds[num_labels*i:num_labels*(i+1)]) for i in range(num_classes)]
         if is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
         else:            
@@ -164,7 +169,8 @@ def main():
         data_collator = None
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = get_trainer(
+        dataset_name=data_args.dataset_name,
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,

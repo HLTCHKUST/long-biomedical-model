@@ -173,7 +173,7 @@ def load_datasets(data_args, model_args, training_args):
             for dict_string in example['labels']:
                 disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
                 label = dict_string[dict_string.find('label')+len('label')+4:-2]
-                label_numerized[unique_disease_names_to_id[disease_name]] = float(unique_labels_to_id[label])
+                label_numerized[unique_disease_names_to_id[disease_name]] = int(unique_labels_to_id[label])
 
             example['labels'] = [-1 if label==None else label for label in label_numerized]
             return example
@@ -193,11 +193,11 @@ def load_datasets(data_args, model_args, training_args):
         unique_labels.sort()
         unique_disease_names = list(set(disease_names))
         unique_disease_names.sort()
-        num_labels = len(unique_disease_names)
+        num_labels = len(unique_disease_names) * len(unique_labels)
         unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
         unique_disease_names_to_id = {v: i for i, v in enumerate(unique_disease_names)}
         
-        raw_datasets = raw_datasets.map(numerize_multiclass_label)
+        raw_datasets = raw_datasets.map(numerize_multiclass_label, load_from_cache_file=False)
         
     elif data_args.dataset_name == 'n2c2_2014_risk_factors':
         def one_hot_multiclass_label(example):
@@ -399,7 +399,7 @@ def load_datasets(data_args, model_args, training_args):
         raw_datasets = raw_datasets.map(
             preprocess_function,
             batched=True,
-            load_from_cache_file=not data_args.overwrite_cache,
+            load_from_cache_file=False,
             desc="Running tokenizer on dataset",
         )
     
