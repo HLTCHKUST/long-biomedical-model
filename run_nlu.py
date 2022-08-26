@@ -49,6 +49,9 @@ from src.loader.load_dataset_and_model import load_datasets
 from src.utils.args_helper import DataTrainingArguments, ModelArguments
 from src.trainer.trainer import get_trainer
 
+import torch
+import torch.nn as nn
+
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.22.0.dev0")
 
@@ -56,7 +59,20 @@ require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text
 
 logger = logging.getLogger(__name__)
 
-
+class N2C22006Trainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        labels = inputs.get("labels")
+        # forward pass
+        outputs = model(**inputs)
+        logits = outputs.get("logits")
+        # compute custom loss
+        loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(
+            [1.89090909, 1.3       , 1.89090909, 6.93333333, 0.33015873],
+            device=logits.device
+        ))
+        loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
+        return (loss, outputs) if return_outputs else loss
+    
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -118,8 +134,9 @@ def main():
 
     # Log a few random samples from the training set:
     if training_args.do_train:
-        for index in random.sample(range(len(train_dataset)), 1):
+        for index in random.sample(range(len(train_dataset)), 3):
             logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+            logger.info(tokenizer.decode(train_dataset[index]['input_ids']))
 
     # Get the metric function
     # if data_args.task_name is not None and data_args.dataset_name is not "indonlu":
@@ -131,6 +148,7 @@ def main():
     # predictions and label_ids field) and has to return a dictionary string to float.
     def compute_metrics(p: EvalPrediction):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+        
         if not is_multilabel:
             preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
         else:
@@ -147,7 +165,7 @@ def main():
             preds = [np.argmax(_preds[num_labels*i:num_labels*(i+1)]) for i in range(num_classes)]
         if is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
-        else:            
+        else:
             preds = np.array(preds).astype('int32')
             p.label_ids = np.array(p.label_ids).astype('int32')
             
