@@ -58,20 +58,6 @@ import torch.nn as nn
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
 
 logger = logging.getLogger(__name__)
-
-class N2C22006Trainer(Trainer):
-    def compute_loss(self, model, inputs, return_outputs=False):
-        labels = inputs.get("labels")
-        # forward pass
-        outputs = model(**inputs)
-        logits = outputs.get("logits")
-        # compute custom loss
-        loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(
-            [1.89090909, 1.3       , 1.89090909, 6.93333333, 0.33015873],
-            device=logits.device
-        ))
-        loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
-        return (loss, outputs) if return_outputs else loss
     
 def main():
     # See all possible arguments in src/transformers/training_args.py

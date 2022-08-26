@@ -526,7 +526,7 @@ def load_datasets(data_args, model_args, training_args):
     with training_args.main_process_first(desc="dataset map pre-processing"):
         raw_datasets = raw_datasets.map(
             preprocess_function,
-            batched=True,
+            batched=False,
             load_from_cache_file=False,
             desc="Running tokenizer on dataset",
         )
