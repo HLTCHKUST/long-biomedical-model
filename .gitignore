@@ -323,3 +323,8 @@ $RECYCLE.BIN/
 data/*
 save/*
 biomedical/*
+wandb/*
+datasets/*
+datasets
+log
+log/*
