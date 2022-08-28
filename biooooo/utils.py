@@ -1,4 +1,5 @@
 import datasets
+from bigbio.dataloader import BigBioConfigHelpers
 
 # Manually curated from https://docs.google.com/spreadsheets/d/1Uq6dJXi9qP43_yM3zgbftPpgsI7t7czmQ-rc8cnuW04/edit?usp=sharing
 dataset_config_names = [

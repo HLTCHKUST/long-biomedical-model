@@ -1,66 +1,66 @@
 export DATASET_NAME=n2c2_2006_smokers
 export TOKENIZERS_PARALLELISM=false
 
-# Baselines (bert-base-uncased, bert-base-cased, PubmedBERT, ClinicalBERT)
-CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
-  --model_name_or_path bert-base-uncased \
-  --dataset_name $DATASET_NAME \
-  --do_train \
-  --do_eval \
-  --logging_steps 10 \
-  --max_seq_length 512 \
-  --per_device_train_batch_size 8 \
-  --gradient_accumulation_steps 1 \
-  --learning_rate 1e-5 \
-  --num_train_epochs 30 \
-  --evaluation_strategy epoch \
-  --output_dir ./save/bert-base-uncased-$DATASET_NAME/ \
-  --overwrite_output_dir
+# # Baselines (bert-base-uncased, bert-base-cased, PubmedBERT, ClinicalBERT)
+# CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
+#   --model_name_or_path bert-base-uncased \
+#   --dataset_name $DATASET_NAME \
+#   --do_train \
+#   --do_eval \
+#   --logging_steps 10 \
+#   --max_seq_length 512 \
+#   --per_device_train_batch_size 8 \
+#   --gradient_accumulation_steps 1 \
+#   --learning_rate 1e-5 \
+#   --num_train_epochs 30 \
+#   --evaluation_strategy epoch \
+#   --output_dir ./save/bert-base-uncased-$DATASET_NAME/ \
+#   --overwrite_output_dir
 
-CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
-  --model_name_or_path bert-base-cased \
-  --dataset_name $DATASET_NAME \
-  --do_train \
-  --do_eval \
-  --logging_steps 10 \
-  --max_seq_length 512 \
-  --per_device_train_batch_size 8 \
-  --gradient_accumulation_steps 1 \
-  --learning_rate 1e-5 \
-  --num_train_epochs 30 \
-  --evaluation_strategy epoch \
-  --output_dir ./save/bert-base-cased-$DATASET_NAME/ \
-  --overwrite_output_dir
+# CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
+#   --model_name_or_path bert-base-cased \
+#   --dataset_name $DATASET_NAME \
+#   --do_train \
+#   --do_eval \
+#   --logging_steps 10 \
+#   --max_seq_length 512 \
+#   --per_device_train_batch_size 8 \
+#   --gradient_accumulation_steps 1 \
+#   --learning_rate 1e-5 \
+#   --num_train_epochs 30 \
+#   --evaluation_strategy epoch \
+#   --output_dir ./save/bert-base-cased-$DATASET_NAME/ \
+#   --overwrite_output_dir
 
-CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
-  --model_name_or_path microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract \
-  --dataset_name $DATASET_NAME \
-  --do_train \
-  --do_eval \
-  --logging_steps 10 \
-  --max_seq_length 512 \
-  --per_device_train_batch_size 8 \
-  --gradient_accumulation_steps 1 \
-  --learning_rate 1e-5 \
-  --num_train_epochs 30 \
-  --evaluation_strategy epoch \
-  --output_dir ./save/pubmed-bert-$DATASET_NAME/ \
-  --overwrite_output_dir
+# CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
+#   --model_name_or_path microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract \
+#   --dataset_name $DATASET_NAME \
+#   --do_train \
+#   --do_eval \
+#   --logging_steps 10 \
+#   --max_seq_length 512 \
+#   --per_device_train_batch_size 8 \
+#   --gradient_accumulation_steps 1 \
+#   --learning_rate 1e-5 \
+#   --num_train_epochs 30 \
+#   --evaluation_strategy epoch \
+#   --output_dir ./save/pubmed-bert-$DATASET_NAME/ \
+#   --overwrite_output_dir
 
-CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
-  --model_name_or_path emilyalsentzer/Bio_ClinicalBERT \
-  --dataset_name $DATASET_NAME \
-  --do_train \
-  --do_eval \
-  --logging_steps 10 \
-  --max_seq_length 512 \
-  --per_device_train_batch_size 8 \
-  --gradient_accumulation_steps 1 \
-  --learning_rate 1e-5 \
-  --num_train_epochs 30 \
-  --evaluation_strategy epoch \
-  --output_dir ./save/clinical-bert-$DATASET_NAME/ \
-  --overwrite_output_dir
+# CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
+#   --model_name_or_path emilyalsentzer/Bio_ClinicalBERT \
+#   --dataset_name $DATASET_NAME \
+#   --do_train \
+#   --do_eval \
+#   --logging_steps 10 \
+#   --max_seq_length 512 \
+#   --per_device_train_batch_size 8 \
+#   --gradient_accumulation_steps 1 \
+#   --learning_rate 1e-5 \
+#   --num_train_epochs 30 \
+#   --evaluation_strategy epoch \
+#   --output_dir ./save/clinical-bert-$DATASET_NAME/ \
+#   --overwrite_output_dir
 
 # Bio-LM
 CUDA_VISIBLE_DEVICES=0 python run_nlu.py \
