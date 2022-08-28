@@ -5,7 +5,7 @@ import torch
 
 def get_trainer(dataset_name, *args, **kwargs):
     if dataset_name == "n2c2_2008":
-        return TrainerN2C22018(*args, **kwargs)
+        return TrainerN2C22008(*args, **kwargs)
     elif dataset_name == "n2c2_2006_smokers":
         return TrainerN2C22006(*args, **kwargs)
     else:
@@ -27,21 +27,18 @@ class TrainerN2C22006(Trainer):
         return (loss, outputs) if return_outputs else loss
 
 
-class TrainerN2C22018(Trainer):
+class TrainerN2C22008(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
         logits = outputs.logits
-        num_classes = labels.size()[-1]
-        num_labels = self.model.config.num_labels // num_classes
+        num_labels = labels.size()[-1]
+        num_classes = self.model.config.num_labels // num_labels
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-1)
 
-        # print("labels", labels.size(), labels)
-        # print("logits", logits.size(), logits)
-
         loss = 0
-        for class_id in range(num_classes):
-            class_loss = loss_fct(logits[:, num_labels*class_id:num_labels*(class_id+1)], labels[:, class_id])
+        for label_id in range(num_labels):
+            class_loss = loss_fct(logits[:, num_classes*label_id:num_classes*(label_id+1)], labels[:, label_id])
             loss += class_loss
             
         return (loss, outputs) if return_outputs else loss
