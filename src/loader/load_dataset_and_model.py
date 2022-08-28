@@ -246,7 +246,9 @@ def load_datasets(data_args, model_args, training_args):
         raise NotImplementedError('To this end, we have only implemented the loaders for GLUE and '+", ".join(notes_dataset_names))
     # See more about loading any type of standard or custom dataset at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
-        
+
+    print(raw_datasets["train"][0])
+    print()
     
     def flatten(list_of_lists):
         flattened = []
@@ -346,24 +348,29 @@ def load_datasets(data_args, model_args, training_args):
     elif data_args.dataset_name == 'n2c2_2018_track1':
         
         def one_hot_multiclass_label(example):
-            label_numerized = [1.0]*len(unique_labels)
+            label_numerized = [0.]*len(unique_labels)
+            # print(unique_labels_to_id)
+
+            # print("label", example["labels"])
             for label in example['labels']:
-                label_numerized[unique_labels_to_id[label]] = .0
+                # print(label)
+                label_numerized[unique_labels_to_id[label]] = 1.
+                # print(label_numerized)
 
             example['labels'] = label_numerized
+            # print("numerized", label_numerized)
+            # print()
             return example
         
         is_regression = False
         is_multilabel = True
-        
-        label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
-        label_list.sort()
-        num_labels = len(label_list)
 
-        unique_labels = list(set(flatten_all_list(raw_datasets['train']['labels'])))
+        unique_labels = sorted(list(set(flatten_all_list(raw_datasets['train']['labels']))))
+        num_labels = len(unique_labels)
         unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
 
-        raw_datasets = raw_datasets.map(one_hot_multiclass_label)
+        raw_datasets = raw_datasets.map(one_hot_multiclass_label, load_from_cache_file=False)
+        # quit()
     
     elif data_args.task_name is not None:
         

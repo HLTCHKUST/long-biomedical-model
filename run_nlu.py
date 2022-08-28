@@ -47,7 +47,7 @@ from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_sc
 
 from src.loader.load_dataset_and_model import load_datasets
 from src.utils.args_helper import DataTrainingArguments, ModelArguments
-from src.trainer.trainer import get_trainer
+from src.trainer.trainer import get_trainer, get_compute_metrics
 
 import torch
 import torch.nn as nn
@@ -132,36 +132,6 @@ def main():
 
     # You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
     # predictions and label_ids field) and has to return a dictionary string to float.
-    def compute_metrics(p: EvalPrediction):
-        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-        
-        if not is_multilabel:
-            preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
-        else:
-            preds[np.isnan(preds)]=-1
-            p.label_ids[np.isnan(p.label_ids)]=-1
-            
-            preds = list(itertools.chain.from_iterable(preds))
-            p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
-
-            ## QUICK FIX FOR 2008
-            _preds = preds
-            num_classes = len(p.label_ids)
-            num_labels = len(preds) // num_classes
-            preds = [np.argmax(_preds[num_labels*i:num_labels*(i+1)]) for i in range(num_classes)]
-        if is_regression:
-            return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
-        else:
-            preds = np.array(preds).astype('int32')
-            p.label_ids = np.array(p.label_ids).astype('int32')
-            
-            return {"acc": accuracy_score(p.label_ids, preds),
-                    "micro-f1": f1_score(p.label_ids, preds, average='micro'),
-                    "micro-recall": recall_score(p.label_ids, preds, average='micro'),
-                    "micro-prec": precision_score(p.label_ids, preds, average='micro'),
-                    "macro-f1": f1_score(p.label_ids, preds, average='macro'),
-                    "macro-recall": recall_score(p.label_ids, preds, average='macro'),
-                    "macro-prec": precision_score(p.label_ids, preds, average='macro')}
 
     # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
     # we already did the padding.
@@ -179,7 +149,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
-        compute_metrics=compute_metrics,
+        compute_metrics=get_compute_metrics(data_args.dataset_name),
         tokenizer=tokenizer,
         data_collator=data_collator,
     )
