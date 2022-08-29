@@ -58,7 +58,7 @@ def get_compute_metrics(dataset_name):
         preds = list(itertools.chain.from_iterable(preds))
         p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
 
-        preds = np.array(preds).astype('int32')
+        preds = np.where(np.array(preds) <=0, 0, 1).astype('int32')
         p.label_ids = np.array(p.label_ids).astype('int32')
         
         p.label_ids, preds = zip(*list(filter(lambda row: row[0] != -1, zip(p.label_ids, preds))))
