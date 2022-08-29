@@ -163,7 +163,7 @@ def load_datasets(data_args, model_args, training_args):
     # download the dataset.
     
     notes_dataset_names = ['n2c2_2006_smokers', 'n2c2_2008', 'n2c2_2014_risk_factors', 'n2c2_2018_track1']
-    if data_args.dataset_name in notes_dataset_names:
+    if data_args.dataset_name in notes_dataset_names + ['n2c2_2008_intuitive', 'n2c2_2008_textual']:
         
         conhelps = BigBioConfigHelpers()
         notes_dset_helpers = conhelps.filtered(
@@ -183,7 +183,10 @@ def load_datasets(data_args, model_args, training_args):
                 raw_datasets[helper.dataset_name] = helper.load_dataset()
                 
         # Choose dataset
-        raw_datasets = raw_datasets[data_args.dataset_name]
+        if 'n2c2_2008' in data_args.dataset_name:
+            raw_datasets = raw_datasets['n2c2_2008']
+        else:
+            raw_datasets = raw_datasets[data_args.dataset_name]
     elif data_args.dataset_name == 'indonlu':
         raw_datasets = load_dataset(
             data_args.dataset_name,
@@ -191,59 +194,6 @@ def load_datasets(data_args, model_args, training_args):
             cache_dir=model_args.cache_dir,
             use_auth_token=True if model_args.use_auth_token else None,
         )
-    # elif data_args.task_name is not None:
-    #     # Downloading and loading a dataset from the hub.
-    #     raw_datasets = load_dataset(
-    #         "glue",
-    #         data_args.task_name,
-    #         cache_dir=model_args.cache_dir,
-    #         use_auth_token=True if model_args.use_auth_token else None,
-    #     )
-    # elif data_args.dataset_name is not None:
-    #     # Downloading and loading a dataset from the hub.
-    #     raw_datasets = load_dataset(
-    #         data_args.dataset_name,
-    #         data_args.dataset_config_name,
-    #         cache_dir=model_args.cache_dir,
-    #         use_auth_token=True if model_args.use_auth_token else None,
-    #     )
-#     else:
-#         # Loading a dataset from your local files.
-#         # CSV/JSON training and evaluation files are needed.
-#         data_files = {"train": data_args.train_file, "validation": data_args.validation_file}
-
-#         # Get the test dataset: you can provide your own CSV/JSON test file (see below)
-#         # when you use `do_predict` without specifying a GLUE benchmark task.
-#         if training_args.do_predict:
-#             if data_args.test_file is not None:
-#                 train_extension = data_args.train_file.split(".")[-1]
-#                 test_extension = data_args.test_file.split(".")[-1]
-#                 assert (
-#                     test_extension == train_extension
-#                 ), "`test_file` should have the same extension (csv or json) as `train_file`."
-#                 data_files["test"] = data_args.test_file
-#             else:
-#                 raise ValueError("Need either a GLUE task or a test file for `do_predict`.")
-
-#         for key in data_files.keys():
-#             logger.info(f"load a local file for {key}: {data_files[key]}")
-
-#         if data_args.train_file.endswith(".csv"):
-#             # Loading a dataset from local csv files
-#             raw_datasets = load_dataset(
-#                 "csv",
-#                 data_files=data_files,
-#                 cache_dir=model_args.cache_dir,
-#                 use_auth_token=True if model_args.use_auth_token else None,
-#             )
-#         else:
-#             # Loading a dataset from local json files
-#             raw_datasets = load_dataset(
-#                 "json",
-#                 data_files=data_files,
-#                 cache_dir=model_args.cache_dir,
-#                 use_auth_token=True if model_args.use_auth_token else None,
-#             )
     else:
         raise NotImplementedError('To this end, we have only implemented the loaders for GLUE and '+", ".join(notes_dataset_names))
     # See more about loading any type of standard or custom dataset at
@@ -286,15 +236,49 @@ def load_datasets(data_args, model_args, training_args):
         label_list = sorted(list(set(flatten_all_list(raw_datasets['train']['labels']))))
         num_labels = len(label_list)
         
-    elif data_args.dataset_name == 'n2c2_2008':
-        
+    elif data_args.dataset_name == 'n2c2_2008_intuitive':        
         def numerize_multiclass_label(example):
-
             label_numerized = [None]*len(unique_disease_names)
-            for dict_string in example['labels']:
-                disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
-                label = dict_string[dict_string.find('label')+len('label')+4:-2]
-                label_numerized[unique_disease_names_to_id[disease_name]] = int(unique_labels_to_id[label])
+            for anot_string in example['labels']:
+                anot = eval(anot_string)
+                if anot['annotation'] == 'intuitive':
+                    disease_name=anot['disease_name']
+                    label=anot['label']
+                    label_numerized[unique_disease_names_to_id[disease_name]] = int(unique_labels_to_id[label])
+
+            example['labels'] = [-1 if label==None else label for label in label_numerized]
+            return example
+        
+        is_regression = False
+        is_multilabel = True
+        
+        disease_names, labels = [], []
+        label_list = list(set(flatten_all_list(raw_datasets['train']['labels'])))
+        for dict_string in label_list:
+            disease_name = dict_string[dict_string.find('disease_name')+len('disease_name')+4:dict_string.find('label')-4]
+            label = dict_string[dict_string.find('label')+len('label')+4:-2]
+            disease_names.append(disease_name)
+            labels.append(label)
+
+        unique_labels = list(set(labels))
+        unique_labels.sort()
+        unique_disease_names = list(set(disease_names))
+        unique_disease_names.sort()
+        num_labels = len(unique_disease_names) * len(unique_labels)
+        unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
+        unique_disease_names_to_id = {v: i for i, v in enumerate(unique_disease_names)}
+        
+        raw_datasets = raw_datasets.map(numerize_multiclass_label, load_from_cache_file=False)
+        
+    elif data_args.dataset_name == 'n2c2_2008_textual':  
+        def numerize_multiclass_label(example):
+            label_numerized = [None]*len(unique_disease_names)
+            for anot_string in example['labels']:
+                anot = eval(anot_string)
+                if anot['annotation'] == 'textual':
+                    disease_name=anot['disease_name']
+                    label=anot['label']
+                    label_numerized[unique_disease_names_to_id[disease_name]] = int(unique_labels_to_id[label])
 
             example['labels'] = [-1 if label==None else label for label in label_numerized]
             return example
@@ -438,7 +422,10 @@ def load_datasets(data_args, model_args, training_args):
         raw_datasets = raw_datasets.map(delist)
         sentence1_key = 'text'
         sentence2_key = None
-    elif data_args.dataset_name == 'n2c2_2008':
+    elif data_args.dataset_name == 'n2c2_2008_intuitive':
+        sentence1_key = 'text'
+        sentence2_key = None
+    elif data_args.dataset_name == 'n2c2_2008_textual':
         sentence1_key = 'text'
         sentence2_key = None
     elif data_args.dataset_name == 'n2c2_2014_risk_factors':

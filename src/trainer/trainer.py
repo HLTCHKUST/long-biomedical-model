@@ -8,9 +8,9 @@ import torch.nn as nn
 
 
 def get_trainer(dataset_name, *args, **kwargs):
-    if dataset_name == "n2c2_2008":
+    if "n2c2_2008" in dataset_name:
         return TrainerN2C22008(*args, **kwargs)
-    elif dataset_name == "n2c2_2006_smokers":
+    elif "n2c2_2006" in dataset_name:
         return TrainerN2C22006(*args, **kwargs)
     else:
         return Trainer(*args, **kwargs)
@@ -23,10 +23,11 @@ class TrainerN2C22006(Trainer):
         outputs = model(**inputs)
         logits = outputs.get("logits")
         # compute custom loss
-        loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(
-            [1.89090909, 1.3       , 1.89090909, 6.93333333, 0.33015873],
-            device=logits.device
-        ))
+        loss_fct = nn.CrossEntropyLoss()
+        # loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(
+        #     [1.89090909, 1.3       , 1.89090909, 6.93333333, 0.33015873],
+        #     device=logits.device
+        # ))
         loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
         return (loss, outputs) if return_outputs else loss
 
@@ -42,7 +43,7 @@ class TrainerN2C22008(Trainer):
         loss = 0
         for label_id in range(num_labels):
             class_loss = loss_fct(logits[:, num_classes*label_id:num_classes*(label_id+1)], labels[:, label_id])
-            loss += class_loss
+            loss += class_loss / num_labels
             
         return (loss, outputs) if return_outputs else loss
 
@@ -60,6 +61,8 @@ def get_compute_metrics(dataset_name):
         preds = np.array(preds).astype('int32')
         p.label_ids = np.array(p.label_ids).astype('int32')
         
+        p.label_ids, preds = zip(*list(filter(lambda row: row[0] != -1, zip(p.label_ids, preds))))
+
         return {"acc": accuracy_score(p.label_ids, preds),
                 "micro-f1": f1_score(p.label_ids, preds, average='micro'),
                 "micro-recall": recall_score(p.label_ids, preds, average='micro'),
@@ -83,6 +86,8 @@ def get_compute_metrics(dataset_name):
         preds = np.array(preds).astype('int32')
         p.label_ids = np.array(p.label_ids).astype('int32')
         
+        p.label_ids, preds = zip(*list(filter(lambda row: row[0] != -1, zip(p.label_ids, preds))))
+        
         return {"acc": accuracy_score(p.label_ids, preds),
                 "micro-f1": f1_score(p.label_ids, preds, average='micro'),
                 "micro-recall": recall_score(p.label_ids, preds, average='micro'),
@@ -105,11 +110,11 @@ def get_compute_metrics(dataset_name):
                 "macro-recall": recall_score(p.label_ids, preds, average='macro'),
                 "macro-prec": precision_score(p.label_ids, preds, average='macro')}
 
-    if dataset_name == "n2c2_2008":
+    if "n2c2_2008" in dataset_name:
         return multi_class_multi_label_metrics
-    elif dataset_name == "n2c2_2006_smokers":
+    elif "n2c2_2006" in dataset_name:
         return single_label_metrics
-    elif dataset_name == "n2c2_2018_track1":
+    elif "n2c2_2018" in dataset_name:
         return single_class_multi_label_metrics
     else:
         # preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
