@@ -1,4 +1,4 @@
-export DATASET_NAME=n2c2_2008
+export DATASET_NAME=n2c2_2008_textual
 export TOKENIZERS_PARALLELISM=false
 
 # Baselines (bert-base-uncased, bert-base-cased, PubmedBERT, ClinicalBERT)
