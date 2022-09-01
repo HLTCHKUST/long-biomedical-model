@@ -6,17 +6,24 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from .eval_n2c2_2018 import eval_n2c2_2018
+
 
 def get_trainer(dataset_name, *args, **kwargs):
     if "n2c2_2008" in dataset_name:
         return TrainerN2C22008(*args, **kwargs)
     elif "n2c2_2006" in dataset_name:
         return TrainerN2C22006(*args, **kwargs)
+    elif "n2c2_2018" in dataset_name:
+        print('n2c2_2018 Trainer')
+        return TrainerN2C22018(*args, **kwargs)
     else:
+        print('OTHER Trainer')
         return Trainer(*args, **kwargs)
 
 
 class TrainerN2C22006(Trainer):
+    
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.get("labels")
         # forward pass
@@ -24,14 +31,15 @@ class TrainerN2C22006(Trainer):
         logits = outputs.get("logits")
         # compute custom loss
         loss_fct = nn.CrossEntropyLoss()
-        # loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(
-        #     [1.89090909, 1.3       , 1.89090909, 6.93333333, 0.33015873],
-        #     device=logits.device
-        # ))
+        # loss_weights = torch.tensor([
+        #     1.89090909, 1.3, 1.89090909, 6.93333333, 0.33015873
+        # ], dtype=torch.float, requires_grad=False, device=logits.device)
+        # loss_fct = nn.CrossEntropyLoss(weight=loss_weights, device=logits.device)
         loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
         return (loss, outputs) if return_outputs else loss
 
 class TrainerN2C22008(Trainer):
+    
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
@@ -47,6 +55,33 @@ class TrainerN2C22008(Trainer):
             
         return (loss, outputs) if return_outputs else loss
 
+class TrainerN2C22018(Trainer):
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        labels = inputs.pop("labels")
+        outputs = model(**inputs)
+        logits = outputs.logits
+        num_labels = labels.size()[-1]
+        num_classes = self.model.config.num_labels // num_labels
+
+        loss_weight = torch.tensor([
+            1.623376623, 0.616, 27.85714286, 0.2469135802,
+            1.463414634, 0.9238095238, 15.83333333, 0.05208333333,
+            2.014925373, 201, 0.7876106195, 0.0412371134, 10.22222222
+        ], dtype=torch.float, requires_grad=False, device=logits.device)
+        
+        loss_fct = nn.BCEWithLogitsLoss(pos_weight=loss_weight)
+        # loss_fct = nn.BCEWithLogitsLoss()
+        loss = loss_fct(logits, labels.float().to(logits.device))
+        
+        # loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-1)        
+        # loss = 0
+        # for label_id in range(num_labels):
+        #     class_loss = loss_fct(logits[:, num_classes*label_id:num_classes*(label_id+1)], labels[:, label_id])
+        #     loss += class_loss / num_labels
+            
+        return (loss, outputs) if return_outputs else loss
+
 
 def get_compute_metrics(dataset_name):
 
@@ -58,18 +93,29 @@ def get_compute_metrics(dataset_name):
         preds = list(itertools.chain.from_iterable(preds))
         p.label_ids = list(itertools.chain.from_iterable(p.label_ids))
 
-        preds = np.where(np.array(preds) <=0, 0, 1).astype('int32')
+        preds = np.where(np.array(preds) <= 0, 0, 1).astype('int32')
         p.label_ids = np.array(p.label_ids).astype('int32')
         
         p.label_ids, preds = zip(*list(filter(lambda row: row[0] != -1, zip(p.label_ids, preds))))
+        
+        tags = [
+            'ABDOMINAL', 'ADVANCED-CAD', 'ALCOHOL-ABUSE',
+            'ASP-FOR-MI', 'CREATININE', 'DIETSUPP-2MOS',
+            'DRUG-ABUSE', 'ENGLISH', 'HBA1C', 'KETO-1YR',
+            'MAJOR-DIABETES', 'MAKES-DECISIONS', 'MI-6MOS'
+        ]
+        
+        golds, hyps = [], []
+        for i, (g, s) in enumerate(zip(p.label_ids, preds)):
+            if i % len(tags) == 0:
+                gold, hyp = {}, {}
+                golds.append(gold)
+                hyps.append(hyp)
+            gold[tags[i % len(tags)]] = 'met' if g == 1 else 'not met'
+            hyp[tags[i % len(tags)]] = 'met' if s == 1 else 'not met'
 
-        return {"acc": accuracy_score(p.label_ids, preds),
-                "micro-f1": f1_score(p.label_ids, preds, average='micro'),
-                "micro-recall": recall_score(p.label_ids, preds, average='micro'),
-                "micro-prec": precision_score(p.label_ids, preds, average='micro'),
-                "macro-f1": f1_score(p.label_ids, preds, average='macro'),
-                "macro-recall": recall_score(p.label_ids, preds, average='macro'),
-                "macro-prec": precision_score(p.label_ids, preds, average='macro')}
+        metrics = eval_n2c2_2018(golds, hyps)
+        return metrics
 
     def multi_class_multi_label_metrics(p: EvalPrediction): # multiclass multilabel
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -115,6 +161,7 @@ def get_compute_metrics(dataset_name):
     elif "n2c2_2006" in dataset_name:
         return single_label_metrics
     elif "n2c2_2018" in dataset_name:
+        # return multi_class_multi_label_metrics
         return single_class_multi_label_metrics
     else:
         # preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions

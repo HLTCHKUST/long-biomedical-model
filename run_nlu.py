@@ -143,6 +143,7 @@ def main():
         data_collator = None
 
     # Initialize our Trainer
+    training_args.save_strategy="no"
     trainer = get_trainer(
         dataset_name=data_args.dataset_name,
         model=model,
@@ -151,7 +152,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         compute_metrics=get_compute_metrics(data_args.dataset_name),
         tokenizer=tokenizer,
-        data_collator=data_collator,
+        data_collator=data_collator
     )
 
     # Training

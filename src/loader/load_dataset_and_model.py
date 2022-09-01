@@ -337,7 +337,7 @@ def load_datasets(data_args, model_args, training_args):
             # print("label", example["labels"])
             for label in example['labels']:
                 # print(label)
-                label_numerized[unique_labels_to_id[label]] = 1.
+                label_numerized[unique_labels_to_id[label]] = 1
                 # print(label_numerized)
 
             example['labels'] = label_numerized
@@ -349,7 +349,8 @@ def load_datasets(data_args, model_args, training_args):
         is_multilabel = True
 
         unique_labels = sorted(list(set(flatten_all_list(raw_datasets['train']['labels']))))        
-        num_labels = len(unique_labels)
+        num_labels = len(unique_labels) # BCE
+        # num_labels = len(unique_labels) * 2 # CE
         unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
 
         raw_datasets = raw_datasets.map(one_hot_multiclass_label, load_from_cache_file=False)
