@@ -119,10 +119,10 @@ def main():
         is_regression, is_multilabel = load_datasets(data_args, model_args, training_args)
 
     # Log a few random samples from the training set:
-    if training_args.do_train:
-        for index in random.sample(range(len(train_dataset)), 3):
-            logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-            logger.info(tokenizer.decode(train_dataset[index]['input_ids']))
+    # if training_args.do_train:
+    #     for index in random.sample(range(len(train_dataset)), 3):
+    #         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+    #         logger.info(tokenizer.decode(train_dataset[index]['input_ids']))
 
     # Get the metric function
     # if data_args.task_name is not None and data_args.dataset_name is not "indonlu":

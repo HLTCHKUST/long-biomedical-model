@@ -53,7 +53,6 @@ def convert_roberta_like_to_longformer(state_dict, model_name, max_seq_length):
                 state_dict[new_key.replace('.value.','.value_global.')] = state_dict[key]
             elif '.position_embeddings' in new_key:
                 cur_seq_len = state_dict[key].shape[0]
-                print(cur_seq_len, max_seq_length)
                 assert max_seq_length % cur_seq_len == 0
                 
                 multiplier = max_seq_length // cur_seq_len 
@@ -332,25 +331,19 @@ def load_datasets(data_args, model_args, training_args):
         
         def one_hot_multiclass_label(example):
             label_numerized = [0] * len(unique_labels)
-            # print(unique_labels_to_id)
 
-            # print("label", example["labels"])
             for label in example['labels']:
-                # print(label)
                 label_numerized[unique_labels_to_id[label]] = 1
-                # print(label_numerized)
 
             example['labels'] = label_numerized
-            # print("numerized", label_numerized)
-            # print()
             return example
         
         is_regression = False
         is_multilabel = True
 
         unique_labels = sorted(list(set(flatten_all_list(raw_datasets['train']['labels']))))        
-        num_labels = len(unique_labels) # BCE
-        # num_labels = len(unique_labels) * 2 # CE
+        # num_labels = len(unique_labels) # BCE
+        num_labels = len(unique_labels) * 2 # CE
         unique_labels_to_id = {v: i for i, v in enumerate(unique_labels)}
 
         raw_datasets = raw_datasets.map(one_hot_multiclass_label, load_from_cache_file=False)
