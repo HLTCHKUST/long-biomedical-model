@@ -1,16 +1,22 @@
-How Long Is Enough? Exploring the Optimal Intervals of \\ Long-Range Clinical Note Language Modeling
+# How Long Is Enough? Exploring the Optimal Intervals of \\ Long-Range Clinical Note Language Modeling
 
-Prepared for:
+## Overview
+
+
+### Supported Tasks
 - GLUE
 - n2c2_2006_smokers
 - n2c2_2008
 - n2c2_2014_risk_factors
 - n2c2_2018_track1
 
+### Setup
 To use this repo:
-1. Put the data inside `data/n2c2_2006_smokers/*`, `data/n2c2_2008/*`, etc
-2. Run the finetuning. on your terminal do:
+1. Install the dependency through `pip install -r requirements.txt`
+2. Put the local dataset inside `data/n2c2_2006_smokers/*`, `data/n2c2_2008/*`, etc
+3. Run the finetuning. on your terminal do:
     - `bash run_n2c2_2006_smokers.sh` to finetune for n2c2_2006_smokers
     - `bash run_n2c2_2008.sh` to finetune for n2c2_2008
     - `bash run_n2c2_2014_risk_factors.sh` to finetune for n2c2_2014_risk_factors
     - `bash run_n2c2_2018_track1.sh` to finetune for n2c2_2018_track1
+
