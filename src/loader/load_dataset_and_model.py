@@ -5,6 +5,7 @@ import sys
 
 import datasets
 import numpy as np
+import torch 
 from datasets import load_dataset, DatasetDict
 
 import evaluate
@@ -52,11 +53,19 @@ def convert_roberta_like_to_longformer(state_dict, model_name, max_seq_length):
                 state_dict[new_key] = state_dict[key]
                 state_dict[new_key.replace('.value.','.value_global.')] = state_dict[key]
             elif '.position_embeddings' in new_key:
-                cur_seq_len = state_dict[key].shape[0]
+                if model_name == 'roberta':
+                    # cur_seq_len should be -2 because of https://github.com/facebookresearch/fairseq/issues/1187
+                    cur_seq_len = state_dict[key].shape[0] - 2
+                    state_dict[key] = state_dict[key][2:,:]
+                else:
+                    cur_seq_len = state_dict[key].shape[0]
                 assert max_seq_length % cur_seq_len == 0
                 
                 multiplier = max_seq_length // cur_seq_len 
-                state_dict[new_key] = state_dict[key].repeat([multiplier + 1, 1])
+                state_dict[new_key] = torch.cat([
+                    torch.zeros(2, state_dict[key].shape[-1]),
+                    state_dict[key].repeat([multiplier, 1])
+                ], dim=0)
             else:
                 state_dict[new_key] = state_dict[key]
             del state_dict[key]
@@ -82,28 +91,31 @@ def load_long_model(model_args, data_args, num_labels, is_multilabel, is_regress
         )
         biolm_tokenizer = RobertaTokenizer.from_pretrained(model_path)
         
-        # Longify BioLM
-        longformer_config = LongformerConfig.from_pretrained(
-            'allenai/longformer-base-4096',
-            num_labels=num_labels,
-            finetuning_task=data_args.task_name,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-            problem_type='multi_label_classification' if is_multilabel else \
-                         'single_label_classification' if not is_regression else \
-                         'regression',
-            max_position_embeddings=data_args.max_seq_length + 514,
-            vocab_size=biolm_config.vocab_size,
-            type_vocab_size=biolm_config.type_vocab_size,
-            attention_window=[514] * 12
-        )
-        longformer_model = LongformerForSequenceClassification(config=longformer_config)
-        
-        longformer_state_dict = convert_roberta_like_to_longformer(biolm_model.state_dict(), 'roberta', data_args.max_seq_length)
-        longformer_model.load_state_dict(longformer_state_dict, strict=True)
-        
-        return longformer_config, biolm_tokenizer, longformer_model
+        if data_args.max_seq_length == 512:
+            return biolm_config, biolm_tokenizer, biolm_model
+        else:
+            # Longify BioLM
+            longformer_config = LongformerConfig.from_pretrained(
+                'allenai/longformer-base-4096',
+                num_labels=num_labels,
+                finetuning_task=data_args.task_name,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                problem_type='multi_label_classification' if is_multilabel else \
+                             'single_label_classification' if not is_regression else \
+                             'regression',
+                max_position_embeddings=data_args.max_seq_length + 2,
+                vocab_size=biolm_config.vocab_size,
+                type_vocab_size=biolm_config.type_vocab_size,
+                attention_window=[512] * 12
+            )
+            longformer_model = LongformerForSequenceClassification(config=longformer_config)
+
+            longformer_state_dict = convert_roberta_like_to_longformer(biolm_model.state_dict(), 'roberta', data_args.max_seq_length)
+            longformer_model.load_state_dict(longformer_state_dict, strict=True)
+
+            return longformer_config, biolm_tokenizer, longformer_model
     else:
         bioelectra_config = ElectraConfig.from_pretrained(
             model_args.model_name_or_path, 
@@ -122,27 +134,30 @@ def load_long_model(model_args, data_args, num_labels, is_multilabel, is_regress
         )
         bioelectra_tokenizer = ElectraTokenizerFast.from_pretrained(model_args.model_name_or_path)
 
-        # Longify Bioelectra
-        longformer_config = LongformerConfig.from_pretrained(
-            'allenai/longformer-base-4096',
-            num_labels=num_labels,
-            finetuning_task=data_args.task_name,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-            problem_type='multi_label_classification' if is_multilabel else \
-                         'single_label_classification' if not is_regression else \
-                         'regression',
-            max_position_embeddings=data_args.max_seq_length + 512,
-            vocab_size=bioelectra_config.vocab_size,
-            type_vocab_size=bioelectra_config.type_vocab_size,
-            attention_window=[512] * 12
-        )
-        longformer_model = LongformerForSequenceClassification(config=longformer_config)
-        longformer_state_dict = convert_roberta_like_to_longformer(bioelectra_model.state_dict(), 'electra', data_args.max_seq_length)
-        longformer_model.load_state_dict(longformer_state_dict, strict=True)
-        
-        return longformer_config, bioelectra_tokenizer, longformer_model
+        if data_args.max_seq_length == 512:
+            return bioelectra_config, bioelectra_tokenizer, bioelectra_model
+        else:
+            # Longify Bioelectra
+            longformer_config = LongformerConfig.from_pretrained(
+                'allenai/longformer-base-4096',
+                num_labels=num_labels,
+                finetuning_task=data_args.task_name,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                problem_type='multi_label_classification' if is_multilabel else \
+                             'single_label_classification' if not is_regression else \
+                             'regression',
+                max_position_embeddings=data_args.max_seq_length + 2,
+                vocab_size=bioelectra_config.vocab_size,
+                type_vocab_size=bioelectra_config.type_vocab_size,
+                attention_window=[512] * 12
+            )
+            longformer_model = LongformerForSequenceClassification(config=longformer_config)
+            longformer_state_dict = convert_roberta_like_to_longformer(bioelectra_model.state_dict(), 'electra', data_args.max_seq_length)
+            longformer_model.load_state_dict(longformer_state_dict, strict=True)
+
+            return longformer_config, bioelectra_tokenizer, longformer_model
     
 ###
 # General Load Dataset & Models function
